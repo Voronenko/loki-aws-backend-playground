@@ -1,0 +1,97 @@
+version: "3.8"
+
+services:
+  lokiaws:
+    image: grafana/loki:2.3.0
+    ports:
+      - "3101:3100"
+    command: -config.file=/etc/loki/loki-local-config.yaml
+    networks:
+        traefik-public:
+            ipv4_address: "172.19.0.245"
+        monitoring-net: {}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lokiaws.rule=Host(`lokiaws.lvh.voronenko.net`)"
+      - "traefik.http.routers.lokiaws.entrypoints=web"
+      - "traefik.http.routers.lokiaws-secure.entrypoints=websecure"
+      - "traefik.http.routers.lokiaws-secure.rule=Host(`lokiaws.lvh.voronenko.net`)"
+#      - "traefik.http.routers.lokiaws-secure.middlewares=traefik-auth"
+      - "traefik.http.routers.lokiaws-secure.tls=true"
+    volumes:
+      - ./rootfs/etc/loki:/etc/loki:ro
+      - lokiaws-data:/data/loki
+    depends_on:
+      - dynamodb-local
+      - minio
+      - minio_init
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2021-09-18T18-09-59Z
+    ports:
+      - 9000:9000
+    networks:
+      monitoring-net:
+        aliases:
+          - s3.local
+    volumes:
+      - ./data/minio/data:/export
+      - ./data/minio/config:/root/.minio
+    environment:
+      MINIO_ROOT_USER: user
+      MINIO_ROOT_PASSWORD: password
+    command: server /export
+
+
+  minio_init:
+    image: minio/mc
+    depends_on:
+      - minio
+    networks:
+      monitoring-net:
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc config host add myminio http://minio:9000 user password) do echo '...waiting...' && sleep 1; done;
+      /usr/bin/mc mb myminio/chunks;
+      /usr/bin/mc policy download myminio/chunks;
+      /usr/bin/mc admin info minio;
+      exit 0;
+      "
+
+  dynamodb-local:
+    image: amazon/dynamodb-local
+    command: ['-jar', 'DynamoDBLocal.jar', '-inMemory', '-sharedDb']
+    ports:
+      - "8000:8000"
+    networks:
+      monitoring-net:
+        aliases:
+          - dynamodb.local
+
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin
+    command: ["node", "bin/dynamodb-admin.js", "-p", "7777"]
+    environment:
+      DYNAMO_ENDPOINT: http://dynamodb.local:8000
+    ports:
+      - "7777:7777"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dynamodb.rule=Host(`dynamodb.lvh.voronenko.net`)"
+      - "traefik.http.routers.dynamodb.entrypoints=web"
+      - "traefik.http.routers.dynamodb-secure.entrypoints=websecure"
+      - "traefik.http.routers.dynamodb-secure.rule=Host(`dynamodb.lvh.voronenko.net`)"
+#      - "traefik.http.routers.dynamodb-secure.middlewares=traefik-auth"
+      - "traefik.http.routers.dynamodb-secure.tls=true"
+    networks:
+      monitoring-net:
+      traefik-public:
+
+volumes:
+    lokiaws-data: {}
+
+networks:
+  monitoring-net:
+  traefik-public:
+    external: true
+
