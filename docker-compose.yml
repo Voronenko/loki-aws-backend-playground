@@ -12,13 +12,21 @@ x-compose-logging: &compose-logging
        loki-url: "http://192.168.3.5:3100/loki/api/v1/push"
 
 services:
+
+
+  # https://grafana.com/docs/loki/latest/configuration/
+  # You can use environment variable references in the configuration file to set values that need to be configurable during deployment.
+  # To do this, pass -config.expand-env=true and use:
+  # ${VAR}
   lokiaws:
     image: grafana/loki:2.3.0
     # TODO: workaround mkdir /data/loki/chunks: permission denied
     user: root
     ports:
       - "3101:3100"
-    command: -config.file=/etc/loki/loki-local-config.yaml
+    command: -config.file=/etc/loki/loki-local-config.yaml -print-config-stderr -log-config-reverse-order -config.expand-env=true
+    environment:
+      HELLOWORLD: 1
     networks:
         traefik-public:
 #            ipv4_address: "172.19.0.245"
@@ -39,7 +47,7 @@ services:
       - dynamodb-local
       - minio
       - minio_init
-    <<: *compose-logging
+    #<<: *compose-logging
 
   minio:
     image: quay.io/minio/minio:RELEASE.2021-09-18T18-09-59Z
@@ -126,7 +134,6 @@ services:
       - /var/log:/var/log:ro
       - ./rootfs/etc/promtail:/etc/promtail:ro
     command: -config.file=/etc/promtail/promtail-local-config.yml
-
 
 volumes:
     lokiaws-data: {}

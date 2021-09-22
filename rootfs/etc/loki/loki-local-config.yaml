@@ -1,8 +1,20 @@
+# https://grafana.com/docs/loki/latest/configuration/
+# You can use environment variable references in the configuration file to set values that need to be configurable during deployment.
+# To do this, pass -config.expand-env=true and use:
+# ${VAR:-DEFAULTVALUE}
+
+
 # https://grafana.com/docs/loki/latest/configuration/examples/
+
+# Enables authentication through the X-Scope-OrgID header, which must be present
+# if true. If false, the OrgID will always be set to "fake"
 auth_enabled: false
 
 server:
-  http_listen_port: 3100
+  http_listen_port: 3100 # HTTP server listen port # CLI flag: -server.http-listen-port
+  grpc_listen_port: 9095 # gRPC server listen port # CLI flag: -server.grpc-listen-po
+  grpc_server_max_recv_msg_size: 15728640 # Max gRPC message size that can be received # CLI flag: -server.grpc-max-recv-msg-size-bytes default = 4194304
+  grpc_server_max_send_msg_size: 15728640 # Max gRPC message size that can be sent # CLI flag: -server.grpc-max-recv-msg-size-bytes
 
 ingester:
   lifecycler:
@@ -11,7 +23,35 @@ ingester:
       kvstore:
         store: inmemory
       replication_factor: 1
-  chunk_idle_period: 15m
+# How long chunks should sit in-memory with no updates before
+# being flushed if they don't hit the max block size. This means
+# that half-empty chunks will still be flushed after a certain
+# period as long as they receive no further activity.
+# CLI flag: -ingester.chunks-idle-period
+# default = 30 min
+  chunk_idle_period: 5m #15m
+# How long chunks should be retained in-memory after they've been flushed.
+# CLI flag: -ingester.chunks-retain-period
+# default = 15m
+  chunk_retain_period: 30s
+# A target _compressed_ size in bytes for chunks.
+# This is a desired size not an exact size, chunks may be slightly bigger
+# or significantly smaller if they get flushed for other reasons (e.g. chunk_idle_period)
+# The default value of 0 for this will create chunks with a fixed 10 blocks,
+# A non zero value will create chunks with a variable number of blocks to meet the target size.
+# CLI flag: -ingester.chunk-target-size
+  chunk_target_size: 1536000
+# The targeted _uncompressed_ size in bytes of a chunk block
+# When this threshold is exceeded the head block will be cut and compressed inside the chunk.
+# CLI flag: -ingester.chunks-block-size
+  chunk_block_size : 1048576 # The maximum size in bytes a chunk can be before it should be flushed
+# Number of times to try and transfer chunks when leaving before
+# falling back to flushing to the store. Zero = no transfers are done.
+# CLI flag: -ingester.max-transfer-retries
+  max_transfer_retries: 0
+# The maximum duration of a timeseries chunk in memory. If a timeseries runs for longer than this the current chunk will be flushed to the store and a new chunk created.
+# CLI flag: -ingester.max-chunk-age , default 1h
+  max_chunk_age: 5m  #20m
 
 schema_config:
   configs:
@@ -38,17 +78,69 @@ storage_config:
     directory: /data/loki/index
   filesystem:
     directory: /data/loki/chunks
+
+  # Configures storing chunks in AWS. Required options only required when aws is
+  # present.
   aws:
-    s3: s3://user:password@minio:9090/chunks
+    # S3 or S3-compatible endpoint URL with escaped Key and Secret encoded.
+    # If only region is specified as a host, the proper endpoint will be deduced.
+    # Use inmemory:///<bucket-name> to use a mock in-memory implementation.
+    # CLI flag: -s3.url
+    s3: s3://chunks
+    #s3: http://user:password@minio:9000/chunks
+
+  #  # S3 Endpoint to connect to.
+  #  # CLI flag: -s3.endpoint
+  #  [endpoint: <string> | default = ""]
+    endpoint: http://minio:9000
+
+  # # AWS region to use.
+  # # CLI flag: -s3.region
+  # [region: <string> | default = ""]
+
+  # # AWS Access Key ID.
+  # # CLI flag: -s3.access-key-id
+  # [access_key_id: <string> | default = ""]
+
+  # # AWS Secret Access Key.
+  # # CLI flag: -s3.secret-access-key
+  # [secret_access_key: <string> | default = ""]
+
+
     s3forcepathstyle: true
+    insecure: true # remove for real s3
+
     dynamodb:
-#      dynamodb_url: dynamodb://access_key:secret_access_key@region
+
+        # URL for DynamoDB with escaped Key and Secret encoded. If only region is specified as a
+        # host, the proper endpoint will be deduced. Use inmemory:///<bucket-name> to
+        # use a mock in-memory implementation.
+        # CLI flag: -dynamodb.url
+# #      dynamodb_url: dynamodb://access_key:secret_access_key@region
       dynamodb_url: dynamodb://dynamodb.local:8000
 
 limits_config:
   enforce_metric_name: false
   reject_old_samples: true
   reject_old_samples_max_age: 168h
+  # ingestion_rate_mb: 30
+  # ingestion_burst_size_mb: 30
+  # max_streams_per_user: 1000000
+
+chunk_store_config:
+  max_look_back_period: 168h
 
 table_manager:
   retention_period: 168h
+
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /tmp/loki/rules
+  rule_path: /tmp/loki/rules-temp
+  alertmanager_url: http://localhost:9093
+  ring:
+    kvstore:
+      store: inmemory
+  enable_api: true
