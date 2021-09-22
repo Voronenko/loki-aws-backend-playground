@@ -67,7 +67,7 @@ schema_config:
     object_store: s3
     schema: v11
     index:
-      prefix: index_
+      prefix: loki_index_
       period: 24h
       # tags:
       #   app: loki
@@ -86,13 +86,13 @@ storage_config:
     # If only region is specified as a host, the proper endpoint will be deduced.
     # Use inmemory:///<bucket-name> to use a mock in-memory implementation.
     # CLI flag: -s3.url
-    s3: s3://chunks
-    #s3: http://user:password@minio:9000/chunks
+    # s3: s3://chunks
+    s3: http://user:password@minio.:9000/chunks  # HACK! # The period behind the domain forces the S3 library to use it as a host name, not as an AWS region.
 
   #  # S3 Endpoint to connect to.
   #  # CLI flag: -s3.endpoint
   #  [endpoint: <string> | default = ""]
-    endpoint: http://minio:9000
+    endpoint: http://minio.:9000
 
   # # AWS region to use.
   # # CLI flag: -s3.region
@@ -101,14 +101,16 @@ storage_config:
   # # AWS Access Key ID.
   # # CLI flag: -s3.access-key-id
   # [access_key_id: <string> | default = ""]
+  #  access_key_id: user  # consider instance profile for real use
 
   # # AWS Secret Access Key.
   # # CLI flag: -s3.secret-access-key
   # [secret_access_key: <string> | default = ""]
-
+  #  secret_access_key: password # consider instance profile for real use
 
     s3forcepathstyle: true
     insecure: true # remove for real s3
+    # signature_version: s3v4 # for minio only, remove for real s3
 
     dynamodb:
 
@@ -117,7 +119,7 @@ storage_config:
         # use a mock in-memory implementation.
         # CLI flag: -dynamodb.url
 # #      dynamodb_url: dynamodb://access_key:secret_access_key@region
-      dynamodb_url: dynamodb://dynamodb.local:8000
+      dynamodb_url: dynamodb://user:password@dynamodb.local.:8000
 
 limits_config:
   enforce_metric_name: false
@@ -130,15 +132,22 @@ limits_config:
 chunk_store_config:
   max_look_back_period: 168h
 
+# # This component periodically compacts index shards to more performant forms.
+# # Retention through the Compactor is experimental.
+# compactor:
+#   shared_store: s3
+
 table_manager:
   retention_period: 168h
+  retention_deletes_enabled: true
+  poll_interval: 24h
 
 ruler:
   storage:
     type: local
     local:
       directory: /tmp/loki/rules
-  rule_path: /tmp/loki/rules-temp
+  rule_path: /etc/loki/rules
   alertmanager_url: http://localhost:9093
   ring:
     kvstore:

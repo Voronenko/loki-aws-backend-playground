@@ -1,5 +1,15 @@
 # Loki playground with aws S3/DynamoDB backend
 
+## Intro
+
+By default – Loki will store data inside its container / instance, usually under /tmp/loki directory.
+
+For purposes of the current demo, we are emulating S3 with Minio S3 compatible storage, and DynamoDB
+with native Amazon's Dynamodb.local.
+
+On that database we will need to create a table, called `loki_index` with primary key h(string)
+and sort key named r(BinaryType) - note it is same as index/prefix in storage config for s3.
+
 ## Managing docker loki driver
 
 ### Installing
@@ -117,3 +127,12 @@ You can use
 
 $ logcli series --analyze-labels '{}'
 to check the cardinality of your labels and the number of streams.
+
+
+### Strange errors can't flush...
+
+```
+caller=flush.go:118 org_id=fake msg=”failed to flush user” err=”NoCredentialProviders: no valid providers in chain. Deprecated.\n\tFor verbose messaging see aws.Config.CredentialsChainVerboseErrors”
+```
+
+In current demo this can be supressed by Solved using the same ACCESS:SECRET key pair for both S3 and DynamoDB configs.

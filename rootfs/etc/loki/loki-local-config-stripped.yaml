@@ -1,0 +1,68 @@
+auth_enabled: false
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9095
+  grpc_server_max_recv_msg_size: 15728640
+  grpc_server_max_send_msg_size: 15728640
+ingester:
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+  chunk_idle_period: 5m
+  chunk_retain_period: 30s
+  chunk_target_size: 1536000
+  chunk_block_size: 1048576
+  max_transfer_retries: 0
+  max_chunk_age: 5m
+schema_config:
+  configs:
+    - from: 2019-06-01
+      store: boltdb
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 168h
+    - from: 2021-09-21
+      store: aws
+      object_store: s3
+      schema: v11
+      index:
+        prefix: loki_index_
+        period: 24h
+storage_config:
+  boltdb:
+    directory: /data/loki/index
+  filesystem:
+    directory: /data/loki/chunks
+  aws:
+    s3: http://user:password@minio.:9000/chunks
+    endpoint: http://minio.:9000
+    s3forcepathstyle: true
+    insecure: true
+    dynamodb:
+      dynamodb_url: dynamodb://user:password@dynamodb.local.:8000
+limits_config:
+  enforce_metric_name: false
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+chunk_store_config:
+  max_look_back_period: 168h
+table_manager:
+  retention_period: 168h
+  retention_deletes_enabled: true
+  poll_interval: 24h
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /tmp/loki/rules
+  rule_path: /etc/loki/rules
+  alertmanager_url: http://localhost:9093
+  ring:
+    kvstore:
+      store: inmemory
+  enable_api: true
