@@ -53,49 +53,31 @@ ingester:
 # CLI flag: -ingester.max-chunk-age , default 1h
   max_chunk_age: 5m  #20m
 
-# # This component periodically compacts index shards to more performant forms.
-# # Retention through the Compactor is experimental.
-# Needed if we are using boltdb-shipper
-
-compactor:
-  working_directory: /data/retention
-  shared_store: s3
-  compaction_interval: 10m
-  retention_enabled: true
-  retention_delete_delay: 2h
-  retention_delete_worker_count: 150
-
 schema_config:
   configs:
-  # - from: 2019-06-01
-  #   store: boltdb
-  #   object_store: filesystem
-  #   schema: v11
-  #   index:
-  #     prefix: index_
-  #     period: 168h
-  - from: 2021-09-22
-    store: boltdb-shipper
+  - from: 2019-06-01
+    store: boltdb
+    object_store: filesystem
+    schema: v11
+    index:
+      prefix: index_
+      period: 168h
+  - from: 2021-09-21
+    store: aws
     object_store: s3
     schema: v11
     index:
       prefix: loki_index_
-      # invalid schema config: boltdb-shipper works best with 24h periodic index config.
-      # Either add a new config with future date set to 24h to retain the existing index or change the existing config to use 24h period
       period: 24h
       # tags:
-      #   Environment: loki-int
+      #   app: loki
+      #   env: development
 
 storage_config:
-  # boltdb:
-  #   directory: /data/loki/index
+  boltdb:
+    directory: /data/loki/index
   filesystem:
     directory: /data/loki/chunks
-  boltdb_shipper:
-    active_index_directory: /data/loki/index
-    shared_store: s3
-    cache_location: /loki/index_cache
-    resync_interval: 5s
 
   # Configures storing chunks in AWS. Required options only required when aws is
   # present.
@@ -130,14 +112,14 @@ storage_config:
     insecure: true # remove for real s3
     # signature_version: s3v4 # for minio only, remove for real s3
 
-#     dynamodb:
+    dynamodb:
 
-#         # URL for DynamoDB with escaped Key and Secret encoded. If only region is specified as a
-#         # host, the proper endpoint will be deduced. Use inmemory:///<bucket-name> to
-#         # use a mock in-memory implementation.
-#         # CLI flag: -dynamodb.url
-# # #      dynamodb_url: dynamodb://access_key:secret_access_key@region
-#       dynamodb_url: dynamodb://user:password@dynamodb.local.:8000
+        # URL for DynamoDB with escaped Key and Secret encoded. If only region is specified as a
+        # host, the proper endpoint will be deduced. Use inmemory:///<bucket-name> to
+        # use a mock in-memory implementation.
+        # CLI flag: -dynamodb.url
+# #      dynamodb_url: dynamodb://access_key:secret_access_key@region
+      dynamodb_url: dynamodb://user:password@dynamodb.local.:8000
 
 limits_config:
   enforce_metric_name: false
@@ -150,6 +132,11 @@ limits_config:
 chunk_store_config:
   max_look_back_period: 168h
 
+# # This component periodically compacts index shards to more performant forms.
+# # Retention through the Compactor is experimental.
+# compactor:
+#   shared_store: s3
+
 table_manager:
   retention_period: 168h
   retention_deletes_enabled: true
@@ -160,12 +147,6 @@ ruler:
     type: local
     local:
       directory: /tmp/loki/rules
-#   storage:
-#     type: s3
-#     s3:
-# #      s3: s3://region/test-grafana-loki
-#        s3: http://user:password@minio.:9000/loki_ruler
-#        insecure: true
   rule_path: /etc/loki/rules
   alertmanager_url: http://localhost:9093
   ring:

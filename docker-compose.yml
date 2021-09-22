@@ -88,8 +88,9 @@ services:
       /bin/sh -c "
       until (/usr/bin/mc config host add myminio http://minio:9000 user password) do echo '...waiting...' && sleep 1; done;
       /usr/bin/mc mb myminio/chunks;
+      /usr/bin/mc mb myminio/loki_ruler;
       /usr/bin/mc policy download myminio/chunks;
-      /usr/bin/mc admin info minio;
+      /usr/bin/mc policy download myminio/loki_ruler;
       exit 0;
       "
 
@@ -134,6 +135,7 @@ services:
       - /var/log:/var/log:ro
       - ./rootfs/etc/promtail:/etc/promtail:ro
     command: -config.file=/etc/promtail/promtail-local-config.yml
+    <<: *compose-logging
 
 volumes:
     lokiaws-data: {}

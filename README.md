@@ -117,6 +117,23 @@ add some objects to bucket
 aws --endpoint-url http://minio.lvh.voronenko.net:9000 s3 cp docker-compose.yml s3://mybucket
 ```
 
+## Scope of the demo.
+
+Demo illustrates running loki in two different modes:
+
+### S3 + DynamoDB
+
+In that scenario - log chunks are stored on a AWS S3 compatible storage, and index is stored in AWS DocumentDB.
+Corresponding configuration file `rootfs/etc/loki/loki-local-config-dynamodb.yml`
+
+Presence of the DynamoDB, which also adds additional cost of ownership might be additional point to consider.
+
+### Pure S3 using BoltDB Shipper
+
+BoltDB Shipper lets you run Loki without any dependency on NoSQL stores for storing index. It locally stores the index in BoltDB files instead and keeps shipping those files to a shared object store i.e the same object store which is being used for storing chunks. It also keeps syncing BoltDB files from shared object store to a configured local directory for getting index entries created by other services of same Loki cluster. This helps run Loki with one less dependency and also saves costs in storage since object stores are likely to be much cheaper compared to cost of a hosted NoSQL store or running a self hosted instance of Cassandra.
+
+Corresponding configuration file `rootfs/etc/loki/loki-local-config.yml`
+
 ## Known issues
 
 ### Large number of small files in S3 bucket
