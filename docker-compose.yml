@@ -1,15 +1,29 @@
 version: "3.8"
 
+x-compose-logging: &compose-logging
+  logging:
+    # Leave local for classic log
+    # driver: local
+
+    # For log redirection: add service to the external loki network
+    # service will be resolved by name
+     driver: loki
+     options:
+       loki-url: "http://192.168.3.5:3100/loki/api/v1/push"
+
 services:
   lokiaws:
     image: grafana/loki:2.3.0
+    # TODO: workaround mkdir /data/loki/chunks: permission denied
+    user: root
     ports:
       - "3101:3100"
     command: -config.file=/etc/loki/loki-local-config.yaml
     networks:
         traefik-public:
-            ipv4_address: "172.19.0.245"
+#            ipv4_address: "172.19.0.245"
         monitoring-net: {}
+        # loki: {}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.lokiaws.rule=Host(`lokiaws.lvh.voronenko.net`)"
@@ -20,28 +34,40 @@ services:
       - "traefik.http.routers.lokiaws-secure.tls=true"
     volumes:
       - ./rootfs/etc/loki:/etc/loki:ro
-      - lokiaws-data:/data/loki
+      - lokiaws-data:/data/loki:rw
     depends_on:
       - dynamodb-local
       - minio
       - minio_init
+    <<: *compose-logging
 
   minio:
     image: quay.io/minio/minio:RELEASE.2021-09-18T18-09-59Z
     ports:
       - 9000:9000
+      - 10000:10000
     networks:
       monitoring-net:
         aliases:
           - s3.local
+      # loki: {}
     volumes:
       - ./data/minio/data:/export
       - ./data/minio/config:/root/.minio
     environment:
       MINIO_ROOT_USER: user
       MINIO_ROOT_PASSWORD: password
-    command: server /export
-
+    command: server /export --console-address ":10000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.minio.rule=Host(`minio.lvh.voronenko.net`)"
+      - "traefik.http.routers.minio.entrypoints=web"
+      - "traefik.http.services.minio.loadbalancer.server.port=10000"
+      - "traefik.http.routers.minio-secure.entrypoints=websecure"
+      - "traefik.http.routers.minio-secure.rule=Host(`minio.lvh.voronenko.net`)"
+#      - "traefik.http.routers.minio-secure.middlewares=traefik-auth"
+      - "traefik.http.routers.minio-secure.tls=true"
+    <<: *compose-logging
 
   minio_init:
     image: minio/mc
@@ -49,6 +75,7 @@ services:
       - minio
     networks:
       monitoring-net:
+    <<: *compose-logging
     entrypoint: >
       /bin/sh -c "
       until (/usr/bin/mc config host add myminio http://minio:9000 user password) do echo '...waiting...' && sleep 1; done;
@@ -67,6 +94,8 @@ services:
       monitoring-net:
         aliases:
           - dynamodb.local
+      # loki: {}
+    <<: *compose-logging
 
   dynamodb-admin:
     image: aaronshaf/dynamodb-admin
@@ -84,8 +113,20 @@ services:
 #      - "traefik.http.routers.dynamodb-secure.middlewares=traefik-auth"
       - "traefik.http.routers.dynamodb-secure.tls=true"
     networks:
+      monitoring-net: {}
+      traefik-public: {}
+      # loki: {}
+    <<: *compose-logging
+
+  promtail:
+    image: grafana/promtail:2.3.0
+    networks:
       monitoring-net:
-      traefik-public:
+    volumes:
+      - /var/log:/var/log:ro
+      - ./rootfs/etc/promtail:/etc/promtail:ro
+    command: -config.file=/etc/promtail/promtail-local-config.yml
+
 
 volumes:
     lokiaws-data: {}
@@ -94,4 +135,5 @@ networks:
   monitoring-net:
   traefik-public:
     external: true
-
+  # loki:
+  #   external: true
