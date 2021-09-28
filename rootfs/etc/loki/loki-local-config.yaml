@@ -139,6 +139,14 @@ storage_config:
 # # #      dynamodb_url: dynamodb://access_key:secret_access_key@region
 #       dynamodb_url: dynamodb://user:password@dynamodb.local.:8000
 
+# Configuring the retention period
+# Retention period is configured within the limits_config configuration section.
+#There are two ways of setting retention policies:
+#retention_period which is applied globally.
+#retention_stream which is only applied to chunks matching the selector
+
+# https://grafana.com/docs/loki/latest/operations/storage/retention/
+
 limits_config:
   enforce_metric_name: false
   reject_old_samples: true
@@ -148,12 +156,16 @@ limits_config:
   # max_streams_per_user: 1000000
 
 chunk_store_config:
-  max_look_back_period: 168h
+  # keep in sync with table_manager->retention_period
+  # Loki requires that retention (2520h below) is divisible by the duration of each index table (168h by default)
+  max_look_back_period: 2520h
 
 table_manager:
-  retention_period: 168h
+  # keep in sync with chunk_store_config->max_query_lookback
+  retention_period: 2520h
   retention_deletes_enabled: true
-  poll_interval: 24h
+  poll_interval: 24
+
 
 ruler:
   storage:

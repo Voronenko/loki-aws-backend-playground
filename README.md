@@ -153,3 +153,19 @@ caller=flush.go:118 org_id=fake msg=”failed to flush user” err=”NoCredenti
 ```
 
 In current demo this can be supressed by Solved using the same ACCESS:SECRET key pair for both S3 and DynamoDB configs.
+
+
+###  Access denied during syncing tables
+
+Related issue: https://github.com/grafana/loki/issues/2868
+
+```
+msg=""error syncing tables"" err=""AccessDenied: Access Denied
+\tstatus code: 403, request id: 13650B3B4BBE6387, host id: 82wYupHP/XAKe66FDSAlEwlfTju5D8mRobyDx2G0BccSkK22q5pXbyWF2Qwtn8OAgj+i5OH7br8="""
+```
+
+Quite strange workaround:
+
+```
+So instead of s3://endpoint/bucket it should rather be https://endpoint:443/bucket
+```
